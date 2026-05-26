@@ -21,13 +21,22 @@ public class HelloController {
     private Button selectedButton = null;
     private int sourceCol = -1, sourceRow = -1;
     private boolean isWhiteTurn = true;
+
+    // Переменные для взятия на проходе
     private int enPassantTargetCol = -1;
     private int enPassantTargetRow = -1;
+
+    // Флаги для рокировки
+    private boolean wKingMoved = false;
+    private boolean wRookLeftMoved = false;
+    private boolean wRookRightMoved = false;
+    private boolean bKingMoved = false;
+    private boolean bRookLeftMoved = false;
+    private boolean bRookRightMoved = false;
 
     @FXML
     void initialize() {
         chessGrid.setAlignment(Pos.CENTER);
-
         createBoard();
         restartGame();
     }
@@ -37,14 +46,11 @@ public class HelloController {
         for (int row = 0; row < 8; row++) {
             for (int col = 0; col < 8; col++) {
                 Button btn = new Button();
-
                 btn.setMinWidth(75); btn.setMaxWidth(75); btn.setPrefWidth(75);
                 btn.setMinHeight(75); btn.setMaxHeight(75); btn.setPrefHeight(75);
                 btn.setPadding(Insets.EMPTY);
                 btn.setFocusTraversable(false);
-
                 btn.setOnAction(this::btnClick);
-
                 chessGrid.add(btn, col, row);
             }
         }
@@ -57,19 +63,22 @@ public class HelloController {
         selectedButton = null;
         enPassantTargetCol = -1;
         enPassantTargetRow = -1;
+
+        // Сброс флагов рокировки
+        wKingMoved = false; wRookLeftMoved = false; wRookRightMoved = false;
+        bKingMoved = false; bRookLeftMoved = false; bRookRightMoved = false;
+
         refreshUI();
     }
 
     private void setChessLogic() {
         for(int i=0; i<8; i++) for(int j=0; j<8; j++) gameField[i][j] = 0;
-
         // Черные
         for (int i = 0; i < 8; i++) gameField[i][1] = bPawn;
         gameField[0][0] = gameField[7][0] = bRook;
         gameField[1][0] = gameField[6][0] = bKnight;
         gameField[2][0] = gameField[5][0] = bBishop;
         gameField[3][0] = bQueen; gameField[4][0] = bKing;
-        
         // Белые
         for (int i = 0; i < 8; i++) gameField[i][6] = wPawn;
         gameField[0][7] = gameField[7][7] = wRook;
@@ -90,8 +99,6 @@ public class HelloController {
                 if (btn != null) {
                     char piece = gameField[i][j];
                     String bgColor = ((i + j) % 2 == 0) ? "#eeeed2" : "#769656";
-
-                    // Цвет текста (черный для всех, чтобы было видно на светлом)
                     String textColor = isWhitePiece(piece) ? "#ffffff" : "#000000";
 
                     if (piece == wKing && wCheck) bgColor = "#ff8a80";
@@ -100,7 +107,6 @@ public class HelloController {
                     btn.setStyle("-fx-background-color: " + bgColor + "; " +
                             "-fx-background-insets: 0; -fx-background-radius: 0; " +
                             "-fx-text-fill: " + textColor + "; -fx-font-size: 50px; -fx-cursor: hand;");
-
                     btn.setText(piece == 0 ? "" : String.valueOf(piece));
                 }
             }
@@ -124,46 +130,110 @@ public class HelloController {
         } else {
             if (selectedButton == clickedBtn) { refreshUI(); selectedButton = null; return; }
             char movingPiece = gameField[sourceCol][sourceRow];
+
             if (isValidMove(sourceCol, sourceRow, col, row, movingPiece) && isKingSafeAfterMove(sourceCol, sourceRow, col, row, isWhiteTurn)) {
+
+                // Выполнение взятия на проходе
                 if ((movingPiece == wPawn || movingPiece == bPawn) && col == enPassantTargetCol && row == (isWhitePiece(movingPiece) ? enPassantTargetRow - 1 : enPassantTargetRow + 1)) {
                     gameField[enPassantTargetCol][enPassantTargetRow] = 0;
                 }
+
+                // Перемещение ладьи при рокировке
+                if ((movingPiece == wKing || movingPiece == bKing) && Math.abs(col - sourceCol) == 2) {
+                    int rookSourceCol = (col == 6) ? 7 : 0;
+                    int rookTargetCol = (col == 6) ? 5 : 3;
+                    gameField[rookTargetCol][row] = gameField[rookSourceCol][row];
+                    gameField[rookSourceCol][row] = 0;
+                }
+
+                // Отслеживание ходов для запрета будущих рокировок
+                if (movingPiece == wKing) wKingMoved = true;
+                if (movingPiece == bKing) bKingMoved = true;
+                if (movingPiece == wRook && sourceCol == 0 && sourceRow == 7) wRookLeftMoved = true;
+                if (movingPiece == wRook && sourceCol == 7 && sourceRow == 7) wRookRightMoved = true;
+                if (movingPiece == bRook && sourceCol == 0 && sourceRow == 0) bRookLeftMoved = true;
+                if (movingPiece == bRook && sourceCol == 7 && sourceRow == 0) bRookRightMoved = true;
+
+                // Сброс и установка En Passant
                 enPassantTargetCol = -1; enPassantTargetRow = -1;
                 if ((movingPiece == wPawn || movingPiece == bPawn) && Math.abs(row - sourceRow) == 2) {
                     enPassantTargetCol = col; enPassantTargetRow = row;
                 }
+
+                // Ход основной фигуры
                 gameField[col][row] = movingPiece;
                 gameField[sourceCol][sourceRow] = 0;
+
+                // Превращение пешки на краю доски
                 if (gameField[col][row] == wPawn && row == 0) gameField[col][row] = wQueen;
                 if (gameField[col][row] == bPawn && row == 7) gameField[col][row] = bQueen;
+
                 isWhiteTurn = !isWhiteTurn;
                 refreshUI();
                 checkGameStatus();
-            } else { refreshUI(); }
+            } else {
+                refreshUI();
+            }
             selectedButton = null;
         }
     }
 
-    // --- ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ---
     private boolean isValidMove(int sCol, int sRow, int tCol, int tRow, char piece) {
         if (sCol == tCol && sRow == tRow) return false;
         char target = gameField[tCol][tRow];
         if (target != 0 && isWhitePiece(target) == isWhitePiece(piece)) return false;
         int dCol = Math.abs(tCol - sCol); int dRow = Math.abs(tRow - sRow);
+
+        // Ладья / Ферзь линейно
         if ((piece == wRook || piece == bRook || piece == wQueen || piece == bQueen) && (sCol == tCol || sRow == tRow)) {
             int cs = Integer.compare(tCol, sCol), rs = Integer.compare(tRow, sRow);
             int c = sCol + cs, r = sRow + rs;
             while (c != tCol || r != tRow) { if (gameField[c][r] != 0) return false; c += cs; r += rs; }
             return true;
         }
+        // Слон / Ферзь по диагонали
         if ((piece == wBishop || piece == bBishop || piece == wQueen || piece == bQueen) && dCol == dRow) {
             int cs = Integer.compare(tCol, sCol), rs = Integer.compare(tRow, sRow);
             int c = sCol + cs, r = sRow + rs;
             while (c != tCol || r != tRow) { if (gameField[c][r] != 0) return false; c += cs; r += rs; }
             return true;
         }
+        // Конь Г-образно
         if (piece == wKnight || piece == bKnight) return (dCol == 1 && dRow == 2) || (dCol == 2 && dRow == 1);
-        if (piece == wKing || piece == bKing) return dCol <= 1 && dRow <= 1;
+
+        // Король (Обычный шаг + Рокировка)
+        if (piece == wKing || piece == bKing) {
+            if (dCol <= 1 && dRow <= 1) return true;
+
+            // Рокировка
+            if (sRow == tRow && dCol == 2 && dRow == 0) {
+                boolean isWhite = isWhitePiece(piece);
+                if (isWhite && wKingMoved) return false;
+                if (!isWhite && bKingMoved) return false;
+
+                // Король не может рокировать из-под шаха
+                if (isSquareAttacked(sCol, sRow, !isWhite)) return false;
+
+                if (tCol == 6) { // Короткая рокировка
+                    if (isWhite && wRookRightMoved) return false;
+                    if (!isWhite && bRookRightMoved) return false;
+                    if (gameField[5][sRow] != 0 || gameField[6][sRow] != 0) return false;
+
+                    if (isSquareAttacked(5, sRow, !isWhite) || isSquareAttacked(6, sRow, !isWhite)) return false;
+                    return true;
+                }
+                if (tCol == 2) { // Длинная рокировка
+                    if (isWhite && wRookLeftMoved) return false;
+                    if (!isWhite && bRookLeftMoved) return false;
+                    if (gameField[1][sRow] != 0 || gameField[2][sRow] != 0 || gameField[3][sRow] != 0) return false;
+
+                    if (isSquareAttacked(3, sRow, !isWhite) || isSquareAttacked(2, sRow, !isWhite)) return false;
+                    return true;
+                }
+            }
+            return false;
+        }
+        // Пешка
         if (piece == wPawn || piece == bPawn) {
             int dir = isWhitePiece(piece) ? -1 : 1;
             if (tCol == sCol && tRow == sRow + dir && target == 0) return true;
@@ -175,15 +245,35 @@ public class HelloController {
     }
 
     private boolean isSquareAttacked(int col, int row, boolean byWhite) {
-        for (int i = 0; i < 8; i++) for (int j = 0; j < 8; j++) {
-            char p = gameField[i][j];
-            if (p != 0 && isWhitePiece(p) == byWhite && isValidMove(i, j, col, row, p)) return true;
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                char p = gameField[i][j];
+                if (p != 0 && isWhitePiece(p) == byWhite) {
+                    int dCol = Math.abs(col - i);
+                    int dRow = Math.abs(row - j);
+
+                    // Специальная чистая проверка угроз для каждого типа фигур
+                    if (p == wPawn || p == bPawn) {
+                        int dir = isWhitePiece(p) ? -1 : 1;
+                        if (dCol == 1 && row == j + dir) return true;
+                    } else if (p == wKing || p == bKing) {
+                        if (dCol <= 1 && dRow <= 1) return true;
+                    } else {
+                        // Для остальных фигур (Ладья, Слон, Конь, Ферзь) логика ходов совпадает с логикой атак
+                        if (isValidMove(i, j, col, row, p)) return true;
+                    }
+                }
+            }
         }
         return false;
     }
 
     private boolean isKingSafeAfterMove(int sc, int sr, int tc, int tr, boolean white) {
         char moving = gameField[sc][sr]; char target = gameField[tc][tr];
+
+        // Рокировка уже полностью проверена на шахи внутри isValidMove
+        if ((moving == wKing || moving == bKing) && Math.abs(tc - sc) == 2) return true;
+
         gameField[tc][tr] = moving; gameField[sc][sr] = 0;
         int[] kp = findKing(white);
         boolean safe = !isSquareAttacked(kp[0], kp[1], !white);
@@ -215,7 +305,15 @@ public class HelloController {
         for (int i = 0; i < 8; i++) for (int j = 0; j < 8; j++) {
             if (isValidMove(sc, sr, i, j, p) && isKingSafeAfterMove(sc, sr, i, j, isWhitePiece(p))) {
                 Button btn = getButtonFromGrid(i, j);
-                if (btn != null) btn.setStyle(btn.getStyle() + "-fx-background-color: rgba(129,199,132,0.5);");
+                if (btn != null) {
+                    String baseColor = ((i + j) % 2 == 0) ? "#eeeed2" : "#769656";
+                    String highlightColor = (gameField[i][j] == 0) ? "rgba(129,199,132,0.6)" : "rgba(229,115,115,0.7)";
+
+                    btn.setStyle("-fx-background-color: " + baseColor + ", " + highlightColor + "; " +
+                            "-fx-background-insets: 0, 0; -fx-background-radius: 0; " +
+                            "-fx-text-fill: " + (isWhitePiece(gameField[i][j]) ? "#ffffff" : "#000000") + "; " +
+                            "-fx-font-size: 50px; -fx-cursor: hand;");
+                }
             }
         }
     }
