@@ -9,7 +9,7 @@ import javafx.scene.layout.GridPane;
 import javafx.event.ActionEvent;
 import javafx.scene.Node;
 
-public class HelloController {
+public class PrototypeChess {
 
     @FXML private GridPane chessGrid;
 
@@ -40,14 +40,19 @@ public class HelloController {
 
     private void createBoard() {
         chessGrid.getChildren().clear();
+        chessGrid.getRowConstraints().clear();
+        chessGrid.getColumnConstraints().clear();
+
         for (int row = 0; row < 8; row++) {
             for (int col = 0; col < 8; col++) {
                 Button btn = new Button();
-                btn.setMinWidth(75); btn.setMaxWidth(75); btn.setPrefWidth(75);
-                btn.setMinHeight(75); btn.setMaxHeight(75); btn.setPrefHeight(75);
+
+                btn.setMinWidth(75); btn.setMaxWidth(75); btn.setPrefWidth(75); btn.setMaxWidth(Double.MAX_VALUE);
+                btn.setMinHeight(75); btn.setMaxHeight(75); btn.setPrefHeight(75); btn.setMaxHeight(Double.MAX_VALUE);
                 btn.setPadding(Insets.EMPTY);
                 btn.setFocusTraversable(false);
                 btn.setOnAction(this::btnClick);
+
                 chessGrid.add(btn, col, row);
             }
         }
@@ -67,6 +72,7 @@ public class HelloController {
         refreshUI();
     }
 
+//    pieces arrangement
     private void setChessLogic() {
         for(int i=0; i<8; i++) for(int j=0; j<8; j++) gameField[i][j] = 0;
 
@@ -94,8 +100,8 @@ public class HelloController {
                 Button btn = getButtonFromGrid(i, j);
                 if (btn != null) {
                     char piece = gameField[i][j];
-                    String bgColor = ((i + j) % 2 == 0) ? "#eeeed2" : "#769656";
-                    String textColor = isWhitePiece(piece) ? "#ffffff" : "#000000";
+                    String bgColor = ((i + j) % 2 == 0) ? "#7A6354FF" : "#5e3c2d";
+                    String textColor = isWhitePiece(piece) ? "#eee" : "#252525";
 
                     if (piece == wKing && wCheck) bgColor = "#ff8a80";
                     if (piece == bKing && bCheck) bgColor = "#ff8a80";
@@ -120,7 +126,7 @@ public class HelloController {
             if (pieceAtClick != 0 && isWhiteTurn == isWhitePiece(pieceAtClick)) {
                 selectedButton = clickedBtn;
                 sourceCol = col; sourceRow = row;
-                selectedButton.setStyle(selectedButton.getStyle() + "-fx-background-color: #f7f769;");
+                selectedButton.setStyle(selectedButton.getStyle() + "-fx-background-color: #9f9f42;");
                 highlightMoves(sourceCol, sourceRow, pieceAtClick);
             }
         } else {
@@ -174,6 +180,7 @@ public class HelloController {
         if (target != 0 && isWhitePiece(target) == isWhitePiece(piece)) return false;
         int dCol = Math.abs(tCol - sCol); int dRow = Math.abs(tRow - sRow);
 
+//  Rook & Queen
         if ((piece == wRook || piece == bRook || piece == wQueen || piece == bQueen) && (sCol == tCol || sRow == tRow)) {
             int cs = Integer.compare(tCol, sCol), rs = Integer.compare(tRow, sRow);
             int c = sCol + cs, r = sRow + rs;
@@ -181,6 +188,7 @@ public class HelloController {
             return true;
         }
 
+//  Bishop & Queen
         if ((piece == wBishop || piece == bBishop || piece == wQueen || piece == bQueen) && dCol == dRow) {
             int cs = Integer.compare(tCol, sCol), rs = Integer.compare(tRow, sRow);
             int c = sCol + cs, r = sRow + rs;
@@ -188,8 +196,10 @@ public class HelloController {
             return true;
         }
 
+//  Knight
         if (piece == wKnight || piece == bKnight) return (dCol == 1 && dRow == 2) || (dCol == 2 && dRow == 1);
 
+//  King
         if (piece == wKing || piece == bKing) {
             if (dCol <= 1 && dRow <= 1) return true;
 
@@ -220,6 +230,7 @@ public class HelloController {
             return false;
         }
 
+//  Pawn
         if (piece == wPawn || piece == bPawn) {
             int dir = isWhitePiece(piece) ? -1 : 1;
             if (tCol == sCol && tRow == sRow + dir && target == 0) return true;
@@ -279,7 +290,7 @@ public class HelloController {
             }
         }
         if (!hasMoves) {
-            new Alert(Alert.AlertType.INFORMATION, inCheck ? "Мат!" : "Пат!").showAndWait();
+            new Alert(Alert.AlertType.INFORMATION, inCheck ? "Schaakmat!" : "Pat!").showAndWait();
             restartGame();
         }
     }
